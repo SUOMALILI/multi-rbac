@@ -65,12 +65,14 @@
 </div>
 
 ## ⚠️ Notice:
+
 This application is under active development and is not stable yet!
 Its ideal for users who want to experiment with basic role based access, and restrict others from being able to call specific actions on your home server. (Perhaps this will finally put an end to people expoiting the search feature or widgets to call actions that are not on your dashboard!) This component has been tested on my own instance quite a bit, but there will likely be some bugs that remain. Feel free to contribute directly or raise an issue if there is something you would like tweaked.
 
 Due to the nature of this application patching core functions, its possible that it will break in future updates of home assistant. If this occurs, you may disable the component until its updated to work with the latest version. Disabling the component will cause home assistant to return back to its normal state, without any of the rbac blocking features.
 
 ## ✨ Features
+
 - **Service Call Interception**: Automatically intercepts all Home Assistant service calls.
 - **YAML-Based Configuration**: Ability to define access control rules in a YAML file.
 - **Modernized Frontend for Configuration**: Alternatively use the admin frontend to configure the access control rules.
@@ -86,11 +88,15 @@ Due to the nature of this application patching core functions, its possible that
 ## 🚀 Installation
 
 ### HACS Store
+
 [![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=SamAthanas&category=Integration&repository=user-rbac)
 
 > After installation, restart home assistant and add the RBAC Middleware Service. Configure the settings in the side panel.
+
 ---
+
 ### (Manual Method)
+
 - Copy the files to your server first
   - Component: custom_components/rbac
   - Frontend Script (Add to resources, Javascript Module): /api/rbac/static/rbac.js
@@ -102,17 +108,21 @@ Due to the nature of this application patching core functions, its possible that
 - Test with users to ensure denied action calls are blocked
 
 ## 💡 Creative Ideas
+
 - Restrict non household users to sensitive domains like 'light', 'camera', or home assistant shutdown services
 - Create a guest role that utilizes the current user context in a template to determine if they should have access to your homes entities based on if they are within proximity of your house ('Guest' role is used when they are not at 'home', 'User' role is used if they are at home) {{ states[current_user_str].state != 'home'}}
 
 ## 📝 Notes
-- Admin users or users assigned an admin role will be able to access the RBAC configuration page 
+
+- Admin users or users assigned an admin role will be able to access the RBAC configuration page
 - Its possible to assign templates to each role. Templates will be evaluated each time a user that has that role executes a service call. The template will determine if the users role should be used, or if it should fallback to a different role with an entierly different set of permissions. This makes it possible to create more complex auth systems based on current states from your HA instance.
 - Default domain/enttiy blocklists are supported. Any non-admin user will always have these restrictions enforced.
 - Frontend is built using Preact that compiles into a static page, for easier state management and component isolation.
 
 ## 💡 Future Ideas
+
 > **Note:** The following are some future ideas for this project. Not all of these may be possible to implement.
+
 - Add an option to create a temporary guest page to grant temporary access to specific entities without needing to create a guest account
   - Add a date range or template to determine if the guest page should be active
 - Lock down the entity list so that the backend can only return the entities that a user has access to, without needing to rely on a frontend filtering script
@@ -121,8 +131,8 @@ Due to the nature of this application patching core functions, its possible that
 - Send notifications to users that were blocked from accessing a service
 - Intercept voice commands to return an error message if the user tried to access a blocked service. Right now the returned response always indicates success even if the service call was blocked.
 
-
 ## 🤝 Contributing
+
 Contributions are welcome and much appreciated!
 There are vscode scripts included to easily deploy changes made to the backend or frontend, and auto retart HA when complete.
 
@@ -143,4 +153,18 @@ Alternatively, you may submit an issue if you encounter a problem or want to req
 </p>
 
 ## 📄 License
+
 This project is licensed under the MIT License.
+
+
+
+# Install HACS
+
+```shell
+# install in docker 
+# proxy config
+export https_proxy=socks5h://192.168.88.107:10809
+export http_proxy=socks5h://192.168.88.107:10809
+
+bash hacs.sh
+```
