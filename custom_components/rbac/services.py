@@ -153,7 +153,7 @@ async def async_setup_services(hass: HomeAssistant) -> None:
         user_list = []
         if users:
             for user_id, user_config in users.items():
-                # V3: Get roles array, fallback to single role for backward compatibility
+                # V3: Get roles array, support single role for backward compatibility
                 roles = user_config.get("roles", [])
                 if not roles and "role" in user_config:
                     roles = [user_config.get("role", "unknown")]

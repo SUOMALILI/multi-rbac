@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'preact/hooks';
-import { Modal, Form, Input, Button, Space, Row, Col, Select, InputNumber, Switch, Divider, Typography, notification, Dropdown, Tooltip } from 'antd';
+import { Modal, Form, Input, Button, Space, Row, Col, Select, InputNumber, Switch, Divider, Typography, notification, Dropdown, Tooltip, Checkbox } from 'antd';
 import { PlusOutlined, DeleteOutlined, CheckOutlined, CloseOutlined, ExclamationOutlined, ToolOutlined, CodeOutlined, DownOutlined } from '@ant-design/icons';
 import CodeMirror from '@uiw/react-codemirror';
 import { javascript } from '@codemirror/lang-javascript';
@@ -199,7 +199,7 @@ export function RoleEditModal({
 
   const addDomainRestriction = () => {
     const newIndex = domainRestrictions.length;
-    setDomainRestrictions([...domainRestrictions, { domain: '', services: [], allow: denyAll }]);
+    setDomainRestrictions([...domainRestrictions, { domain: '', services: [], allow: false }]);
     setShowDomainSelects({ ...showDomainSelects, [newIndex]: false });
   };
 
@@ -229,7 +229,7 @@ export function RoleEditModal({
 
   const addEntityRestriction = () => {
     const newIndex = entityRestrictions.length;
-    setEntityRestrictions([...entityRestrictions, { entity: '', services: [], allow: denyAll }]);
+    setEntityRestrictions([...entityRestrictions, { entity: '', services: [], allow: false }]);
     setShowEntitySelects({ ...showEntitySelects, [newIndex]: false });
   };
 
@@ -671,7 +671,7 @@ export function RoleEditModal({
                     <strong>Evaluated result:</strong> {String(templateEvaluatedValue)}
                   </>
                 ) : (
-                  'Jinja2 template that determines when this role should be active. If false, the fallback role will be used.'
+                  'Jinja2 template that determines when this role should be active. If false, the role will be ignored.'
                 )}
               </Text>
             </div>
@@ -772,7 +772,7 @@ export function RoleEditModal({
                     onChange={(checked) => updateDomainRestriction(index, 'allow', checked)}
                     checkedChildren="✓"
                     unCheckedChildren="✗"
-                    disabled={denyAll && restriction.allow}
+                    disabled={false}
                     style={{
                       backgroundColor: restriction.allow ? '#52c41a' : '#ff4d4f'
                     }}
@@ -877,7 +877,7 @@ export function RoleEditModal({
                     onChange={(checked) => updateEntityRestriction(index, 'allow', checked)}
                     checkedChildren="✓"
                     unCheckedChildren="✗"
-                    disabled={denyAll && restriction.allow}
+                    disabled={false}
                     style={{
                       backgroundColor: restriction.allow ? '#52c41a' : '#ff4d4f'
                     }}

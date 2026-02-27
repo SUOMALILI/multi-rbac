@@ -115,7 +115,7 @@ Due to the nature of this application patching core functions, its possible that
 ## 📝 Notes
 
 - Admin users or users assigned an admin role will be able to access the RBAC configuration page
-- Its possible to assign templates to each role. Templates will be evaluated each time a user that has that role executes a service call. The template will determine if the users role should be used, or if it should fallback to a different role with an entierly different set of permissions. This makes it possible to create more complex auth systems based on current states from your HA instance.
+- Its possible to assign templates to each role. Templates will be evaluated each time a user that has that role executes a service call. The template will determine if the users role should be used (merge_condition: true) or ignored (merge_condition: false). This makes it possible to create more complex auth systems based on current states from your HA instance.
 - Default domain/enttiy blocklists are supported. Any non-admin user will always have these restrictions enforced.
 - Frontend is built using Preact that compiles into a static page, for easier state management and component isolation.
 

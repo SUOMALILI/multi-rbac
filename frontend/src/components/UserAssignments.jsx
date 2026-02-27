@@ -26,7 +26,7 @@ export function UserAssignments({ data, onSuccess, onError, onDataChange, isDark
     if (data.config?.users) {
       const roles = {};
       Object.entries(data.config.users).forEach(([userId, userConfig]) => {
-        // V3: roles is now an array, fallback to single role for backward compatibility
+        // V3: roles is now an array, support single role for backward compatibility
         if (Array.isArray(userConfig.roles)) {
           roles[userId] = userConfig.roles;
         } else if (userConfig.role) {
