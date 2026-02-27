@@ -1,19 +1,17 @@
 import { useState, useEffect } from 'preact/hooks';
-import { Modal, Form, Input, Button, Space, Row, Col, Select, InputNumber, Switch, Divider, Typography, notification, Dropdown, Tooltip, Checkbox, Tag } from 'antd';
+import { Modal, Form, Input, Button, Row, Col, Select, Divider, Typography, notification, Dropdown, Tooltip, Checkbox, Tag } from 'antd';
 import { PlusOutlined, DeleteOutlined, CheckOutlined, CloseOutlined, ExclamationOutlined, ToolOutlined, CodeOutlined, DownOutlined } from '@ant-design/icons';
 import CodeMirror from '@uiw/react-codemirror';
 import { javascript } from '@codemirror/lang-javascript';
 
-const { TextArea } = Input;
 const { Text } = Typography;
 
-export function RoleEditModal({ 
-  visible, 
-  onCancel, 
-  onSave, 
-  roleName, 
-  roleConfig, 
-  availableRoles = [],
+export function RoleEditModal({
+  visible,
+  onCancel,
+  onSave,
+  roleName,
+  roleConfig,
   domains = [],
   entities = [],
   services = {}
@@ -25,7 +23,6 @@ export function RoleEditModal({
   const [isAdmin, setIsAdmin] = useState(false);
   const [mergeCondition, setMergeCondition] = useState(true);
   const [templateTestResult, setTemplateTestResult] = useState(null); // null, 'loading', 'true', 'false', 'error'
-  const [templateTestError, setTemplateTestError] = useState('');
   const [templateValue, setTemplateValue] = useState('');
   const [templateEvaluatedValue, setTemplateEvaluatedValue] = useState(null);
   const [currentUserEntity, setCurrentUserEntity] = useState(null);
@@ -51,18 +48,16 @@ export function RoleEditModal({
         Object.entries(roleConfig.permissions.domains).forEach(([domain, config]) => {
           domainRestrictions.push({
             domain,
-            services: config.services || [],
-            allow: config.allow || false
+            services: config.services || []
           });
         });
       }
-      
+
       if (roleConfig.permissions?.entities) {
         Object.entries(roleConfig.permissions.entities).forEach(([entity, config]) => {
           entityRestrictions.push({
             entity,
-            services: config.services || [],
-            allow: config.allow || false
+            services: config.services || []
           });
         });
       }
@@ -73,7 +68,6 @@ export function RoleEditModal({
       setIsAdmin(roleConfig.admin || false);
       setMergeCondition(roleConfig.merge_condition !== undefined ? roleConfig.merge_condition : true);
       setTemplateTestResult(null);
-      setTemplateTestError('');
       setTemplateValue(roleConfig.template || '');
       setTemplateEvaluatedValue(null);
       
@@ -100,7 +94,6 @@ export function RoleEditModal({
       setIsAdmin(false);
       setMergeCondition(true);
       setTemplateTestResult(null);
-      setTemplateTestError('');
       setTemplateValue('');
       setTemplateEvaluatedValue(null);
       setShowDomainSelects({});
@@ -117,36 +110,6 @@ export function RoleEditModal({
     }
   }, [visible]);
 
-  const [showConversionModal, setShowConversionModal] = useState(false);
-
-  const showConversionWarning = () => {
-    setShowConversionModal(true);
-  };
-
-  const handleConversionChoice = (choice) => {
-    setShowConversionModal(false);
-    
-    if (choice === 'convert') {
-      // Convert all restrictions to allow mode
-      const updatedDomainRestrictions = domainRestrictions.map(restriction => ({
-        ...restriction,
-        allow: true
-      }));
-      const updatedEntityRestrictions = entityRestrictions.map(restriction => ({
-        ...restriction,
-        allow: true
-      }));
-      setDomainRestrictions(updatedDomainRestrictions);
-      setEntityRestrictions(updatedEntityRestrictions);
-    } else if (choice === 'clear') {
-      // Clear all restrictions
-      setDomainRestrictions([]);
-      setEntityRestrictions([]);
-    } else if (choice === 'cancel') {
-      // Cancel - keep existing restrictions
-      // No deny_all in V3
-    }
-  };
 
   const handleSave = async () => {
     try {
@@ -155,18 +118,16 @@ export function RoleEditModal({
       // Convert restrictions arrays back to objects
       const domains = {};
       const entities = {};
-      
+
       domainRestrictions.forEach(restriction => {
         domains[restriction.domain] = {
-          services: restriction.services,
-          allow: restriction.allow || false
+          services: restriction.services
         };
       });
-      
+
       entityRestrictions.forEach(restriction => {
         entities[restriction.entity] = {
-          services: restriction.services,
-          allow: restriction.allow || false
+          services: restriction.services
         };
       });
       
@@ -199,7 +160,7 @@ export function RoleEditModal({
 
   const addDomainRestriction = () => {
     const newIndex = domainRestrictions.length;
-    setDomainRestrictions([...domainRestrictions, { domain: '', services: [], allow: false }]);
+    setDomainRestrictions([...domainRestrictions, { domain: '', services: [] }]);
     setShowDomainSelects({ ...showDomainSelects, [newIndex]: false });
   };
 
@@ -229,7 +190,7 @@ export function RoleEditModal({
 
   const addEntityRestriction = () => {
     const newIndex = entityRestrictions.length;
-    setEntityRestrictions([...entityRestrictions, { entity: '', services: [], allow: false }]);
+    setEntityRestrictions([...entityRestrictions, { entity: '', services: [] }]);
     setShowEntitySelects({ ...showEntitySelects, [newIndex]: false });
   };
 
@@ -367,11 +328,9 @@ export function RoleEditModal({
   const handleTestTemplate = async () => {
     try {
       setTemplateTestResult('loading');
-      setTemplateTestError('');
-      
+
       if (!templateValue) {
         setTemplateTestResult('error');
-        setTemplateTestError('No template to test');
         notification.error({
           message: 'Template Test Failed',
           description: 'Please enter a template first',
@@ -404,7 +363,6 @@ export function RoleEditModal({
         setTemplateEvaluatedValue(data.evaluated_value);
       } else {
         setTemplateTestResult('error');
-        setTemplateTestError(data.error);
         setTemplateEvaluatedValue(null);
         notification.error({
           message: 'Template Evaluation Error',
@@ -416,7 +374,6 @@ export function RoleEditModal({
     } catch (error) {
       console.error('Error testing template:', error);
       setTemplateTestResult('error');
-      setTemplateTestError(error.message);
       setTemplateEvaluatedValue(null);
       notification.error({
         message: 'Template Test Failed',
@@ -700,7 +657,7 @@ export function RoleEditModal({
         {domainRestrictions.map((restriction, index) => (
           <div key={index} style={{ marginBottom: 16, padding: 16, border: '1px solid #f0f0f0', borderRadius: 6 }} data-restriction-index={index}>
             <Row gutter={16} align="middle">
-              <Col span={10}>
+              <Col span={12}>
                 <Select
                   showSearch
                   placeholder="Select domain"
@@ -718,7 +675,7 @@ export function RoleEditModal({
               </Col>
               <Col span={10}>
                 {!showDomainSelects[index] ? (
-                  <Tooltip title={restriction.allow ? "Add specific services to allow" : "Add specific services"}>
+                  <Tooltip title="Add specific services to allow">
                     <Button
                       type="dashed"
                       icon={<PlusOutlined />}
@@ -743,14 +700,14 @@ export function RoleEditModal({
                         e.currentTarget.style.color = '#999';
                       }}
                     >
-                      {restriction.allow ? "Allow Services" : "Services"}
+                      Services
                     </Button>
                   </Tooltip>
                 ) : (
                   <Select
                     mode="multiple"
                     showSearch
-                    placeholder={restriction.allow ? "Select services to allow (empty = allow all)" : "Select services (empty = block all)"}
+                    placeholder="Select services to allow (empty = allow all)"
                     value={restriction.services}
                     onChange={(value) => updateDomainRestriction(index, 'services', value)}
                     style={{ width: '100%' }}
@@ -763,21 +720,6 @@ export function RoleEditModal({
                     ))}
                   </Select>
                 )}
-              </Col>
-              <Col span={2}>
-                <Tooltip title={restriction.allow ? "Allow this domain/services" : "Block this domain/services"}>
-                  <Switch
-                    size="small"
-                    checked={restriction.allow}
-                    onChange={(checked) => updateDomainRestriction(index, 'allow', checked)}
-                    checkedChildren="✓"
-                    unCheckedChildren="✗"
-                    disabled={false}
-                    style={{
-                      backgroundColor: restriction.allow ? '#52c41a' : '#ff4d4f'
-                    }}
-                  />
-                </Tooltip>
               </Col>
               <Col span={2}>
                 <Button
@@ -805,7 +747,7 @@ export function RoleEditModal({
         {entityRestrictions.map((restriction, index) => (
           <div key={index} style={{ marginBottom: 16, padding: 16, border: '1px solid #f0f0f0', borderRadius: 6 }} data-restriction-index={index}>
             <Row gutter={16} align="middle">
-              <Col span={10}>
+              <Col span={12}>
                 <Select
                   showSearch
                   placeholder="Select entity"
@@ -823,7 +765,7 @@ export function RoleEditModal({
               </Col>
               <Col span={10}>
                 {!showEntitySelects[index] ? (
-                  <Tooltip title={restriction.allow ? "Add specific services to allow" : "Add specific services"}>
+                  <Tooltip title="Add specific services to allow">
                     <Button
                       type="dashed"
                       icon={<PlusOutlined />}
@@ -848,14 +790,14 @@ export function RoleEditModal({
                         e.currentTarget.style.color = '#999';
                       }}
                     >
-                      {restriction.allow ? "Allow Services" : "Services"}
+                      Services
                     </Button>
                   </Tooltip>
                 ) : (
                   <Select
                     mode="multiple"
                     showSearch
-                    placeholder={restriction.allow ? "Select services to allow (empty = allow all)" : "Select services (empty = block all)"}
+                    placeholder="Select services to allow (empty = allow all)"
                     value={restriction.services}
                     onChange={(value) => updateEntityRestriction(index, 'services', value)}
                     style={{ width: '100%' }}
@@ -868,21 +810,6 @@ export function RoleEditModal({
                     ))}
                   </Select>
                 )}
-              </Col>
-              <Col span={2}>
-                <Tooltip title={restriction.allow ? "Allow this entity/services" : "Block this entity/services"}>
-                  <Switch
-                    size="small"
-                    checked={restriction.allow}
-                    onChange={(checked) => updateEntityRestriction(index, 'allow', checked)}
-                    checkedChildren="✓"
-                    unCheckedChildren="✗"
-                    disabled={false}
-                    style={{
-                      backgroundColor: restriction.allow ? '#52c41a' : '#ff4d4f'
-                    }}
-                  />
-                </Tooltip>
               </Col>
               <Col span={2}>
                 <Button

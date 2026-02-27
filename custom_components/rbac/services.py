@@ -15,15 +15,12 @@ from homeassistant.components.http import HomeAssistantView
 from aiohttp import web
 
 from . import (
-    DOMAIN, 
-    get_user_config, 
+    DOMAIN,
+    get_user_config,
     reload_access_config,
     _is_top_level_user,
     _is_builtin_ha_user,
     add_user_access,
-    remove_user_access,
-    update_user_role,
-    remove_user_restriction,
     _save_access_control_config
 )
 
@@ -314,8 +311,6 @@ async def async_setup_services(hass: HomeAssistant) -> None:
 
 from homeassistant.components.http import HomeAssistantView
 from homeassistant.core import HomeAssistant
-import json
-import logging
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -1108,22 +1103,20 @@ class RBACFrontendBlockingView(HomeAssistantView):
                         if domain not in role_domains:
                             role_domains[domain] = config.copy()
                         else:
-                            # Merge services if both have allow: true
-                            if config.get("allow", False) and role_domains[domain].get("allow", False):
-                                existing_services = set(role_domains[domain].get("services", []))
-                                new_services = set(config.get("services", []))
-                                role_domains[domain]["services"] = list(existing_services.union(new_services))
+                            # Merge services for whitelist permissions
+                            existing_services = set(role_domains[domain].get("services", []))
+                            new_services = set(config.get("services", []))
+                            role_domains[domain]["services"] = list(existing_services.union(new_services))
 
                     # Merge entity permissions
                     for entity, config in role_permissions.get("entities", {}).items():
                         if entity not in role_entities:
                             role_entities[entity] = config.copy()
                         else:
-                            # Merge services if both have allow: true
-                            if config.get("allow", False) and role_entities[entity].get("allow", False):
-                                existing_services = set(role_entities[entity].get("services", []))
-                                new_services = set(config.get("services", []))
-                                role_entities[entity]["services"] = list(existing_services.union(new_services))
+                            # Merge services for whitelist permissions
+                            existing_services = set(role_entities[entity].get("services", []))
+                            new_services = set(config.get("services", []))
+                            role_entities[entity]["services"] = list(existing_services.union(new_services))
 
             # Get user-specific restrictions
             user_restrictions = user_config.get("restrictions", {})
@@ -1137,44 +1130,24 @@ class RBACFrontendBlockingView(HomeAssistantView):
             allowed_domains = []
             allowed_entities = []
                 
-            # Process domains - block all except those with allow: true
+            # Process domains - block all except those in whitelist
             for domain in all_available_domains:
-                    domain_allowed = False
-                    
                     # Check user-specific restrictions first
                     if domain in user_domains:
-                        user_domain_config = user_domains[domain]
-                        if isinstance(user_domain_config, dict):
-                            domain_allowed = user_domain_config.get("allow", False)
-                    
+                        allowed_domains.append(domain)
                     # Check role-specific permissions
-                    if not domain_allowed and domain in role_domains:
-                        role_domain_config = role_domains[domain]
-                        if isinstance(role_domain_config, dict):
-                            domain_allowed = role_domain_config.get("allow", False)
-                    
-                    if domain_allowed:
+                    elif domain in role_domains:
                         allowed_domains.append(domain)
                     else:
                         blocked_domains.append(domain)
                 
-            # Process entities - block all except those with allow: true
+            # Process entities - block all except those in whitelist
             for entity in all_available_entities:
-                    entity_allowed = False
-                    
                     # Check user-specific restrictions first
                     if entity in user_entities:
-                        user_entity_config = user_entities[entity]
-                        if isinstance(user_entity_config, dict):
-                            entity_allowed = user_entity_config.get("allow", False)
-                    
+                        allowed_entities.append(entity)
                     # Check role-specific permissions
-                    if not entity_allowed and entity in role_entities:
-                        role_entity_config = role_entities[entity]
-                        if isinstance(role_entity_config, dict):
-                            entity_allowed = role_entity_config.get("allow", False)
-                    
-                    if entity_allowed:
+                    elif entity in role_entities:
                         allowed_entities.append(entity)
                     else:
                         blocked_entities.append(entity)
