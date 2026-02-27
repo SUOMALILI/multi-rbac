@@ -386,13 +386,14 @@ def _patch_service_registry(hass: HomeAssistant):
                     
                     if not access_result:
                         if service_data and "entity_id" in service_data:
-                            user_role = "unknown"
+                            user_role = "no_roles"
                             if user_id:
                                 users = access_config.get("users", {})
                                 user_config = users.get(user_id)
                                 if user_config:
-                                    user_role = user_config.get("role", "unknown")
-                            
+                                    user_roles = user_config.get("roles", [])
+                                    user_role = user_roles[0] if user_roles else "no_roles"
+
                             _LOGGER.warning(
                                 f"Access denied: {user_name} cannot call {domain}.{service} from role '{user_role}' - {reason}"
                             )
@@ -436,12 +437,13 @@ def _patch_service_registry(hass: HomeAssistant):
                                 except Exception as e:
                                     _LOGGER.error(f"Failed to send event: {e}")
                         
-                        user_role = "unknown"
+                        user_role = "no_roles"
                         if user_id:
                             users = access_config.get("users", {})
                             user_config = users.get(user_id)
                             if user_config:
-                                user_role = user_config.get("role", "unknown")
+                                user_roles = user_config.get("roles", [])
+                                user_role = user_roles[0] if user_roles else "no_roles"
                         
                         if access_config.get("log_deny_list", False):
                             try:
@@ -706,7 +708,8 @@ def _check_service_access_with_reason(
     # V3: Get user roles array
     user_roles = user_config.get("roles", [])
     if not user_roles:
-        return False, f"user {user_id} has no roles assigned, access denied by default"
+        # 允许空角色数组，用户将没有任何权限
+        return False, f"user {user_id} has no roles assigned, access denied"
 
     roles = access_config.get("roles", {})
     reasons = []

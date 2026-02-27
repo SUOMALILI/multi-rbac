@@ -150,15 +150,12 @@ async def async_setup_services(hass: HomeAssistant) -> None:
         user_list = []
         if users:
             for user_id, user_config in users.items():
-                # V3: Get roles array, support single role for backward compatibility
+                # V3: Get roles array, 完全移除role字段支持，只使用roles数组
                 roles = user_config.get("roles", [])
-                if not roles and "role" in user_config:
-                    roles = [user_config.get("role", "unknown")]
-                role = roles[0] if roles else "unknown"
                 access = user_config.get("access", "allow")
                 user_list.append({
                     "user_id": user_id,
-                    "role": role,
+                    "roles": roles,
                     "access": access
                 })
         
@@ -354,15 +351,12 @@ async def _is_admin_user(hass: HomeAssistant, user_id: str, user_obj=None) -> bo
             _LOGGER.warning(f"User {user_id} not found in RBAC configuration")
             return False
         
-        user_role = user_config.get("role", "unknown")
-        if user_role == "unknown":
-            _LOGGER.warning(f"User {user_id} has no role assigned")
-            return False
-        
-        # Get role configuration and check admin flag
-        roles = access_config.get("roles", {})
-        role_config = roles.get(user_role, {})
-        is_rbac_admin = role_config.get("admin", False)
+        # 检查用户是否有任何admin角色
+        user_roles = user_config.get("roles", [])
+        is_rbac_admin = any(
+            roles.get(role_name, {}).get("admin", False)
+            for role_name in user_roles
+        )
         
         if is_rbac_admin:
             _LOGGER.warning(f"User {user_id} has RBAC admin role: {user_role}")
@@ -512,8 +506,17 @@ class RBACConfigView(HomeAssistantView):
                 import re
                 if not re.match(r'^[a-z0-9_]+$', role_name):
                     return self.json({"error": "Role name must contain only lowercase letters, numbers, and underscores"}, status_code=400)
-                
-                # Update or create role
+
+                # Check if role already exists (prevent overwriting)
+                existing_roles = access_config.get("roles", {})
+
+                # 如果是创建新角色，检查是否已存在
+                if role_name not in existing_roles:
+                    # 创建新角色，检查是否已存在（冗余检查）
+                    if role_name in existing_roles:
+                        return self.json({"error": f"Role '{role_name}' already exists"}, status_code=400)
+
+                # 更新或创建角色
                 if "roles" not in access_config:
                     access_config["roles"] = {}
                 access_config["roles"][role_name] = role_config
@@ -532,8 +535,9 @@ class RBACConfigView(HomeAssistantView):
                 # Remove role from users
                 if "users" in access_config:
                     for user_id, user_config in access_config["users"].items():
-                        if user_config.get("role") == role_name:
-                            user_config["role"] = "user"  # Default role
+                        # 只处理roles数组，完全移除role字段
+                        if "roles" in user_config and role_name in user_config["roles"]:
+                            user_config["roles"] = [r for r in user_config["roles"] if r != role_name]
                             
             elif action == "assign_user_roles":
                 user_id = data.get("userId")

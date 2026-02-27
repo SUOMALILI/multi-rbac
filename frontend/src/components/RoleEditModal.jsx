@@ -430,7 +430,20 @@ export function RoleEditModal({
             label="Role Name"
             rules={[
               { required: true, message: 'Please enter a role name' },
-              { pattern: /^[a-z0-9_]+$/, message: 'Role name must be lowercase letters, numbers, and underscores only' }
+              { pattern: /^[a-z0-9_]+$/, message: 'Role name must be lowercase letters, numbers, and underscores only' },
+              {
+                validator: (_, value) => {
+                  if (!value) return Promise.resolve();
+                  // 检查角色是否已存在
+                  const availableRoles = props.availableRoles || [];
+                  // 如果是编辑现有角色，允许相同名称
+                  const isEditingExisting = props.roleName && props.roleName === value;
+                  if (!isEditingExisting && availableRoles.includes(value)) {
+                    return Promise.reject(new Error(`Role '${value}' already exists`));
+                  }
+                  return Promise.resolve();
+                }
+              }
             ]}
             help="Use lowercase letters, numbers, and underscores (e.g., 'power_user', 'guest', 'moderator')"
           >

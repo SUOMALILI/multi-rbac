@@ -26,15 +26,8 @@ export function UserAssignments({ data, onSuccess, onError, onDataChange, isDark
     if (data.config?.users) {
       const roles = {};
       Object.entries(data.config.users).forEach(([userId, userConfig]) => {
-        // V3: roles is now an array, support single role for backward compatibility
-        if (Array.isArray(userConfig.roles)) {
-          roles[userId] = userConfig.roles;
-        } else if (userConfig.role) {
-          // Legacy single role format
-          roles[userId] = [userConfig.role];
-        } else {
-          roles[userId] = ['user'];
-        }
+        // 只使用roles数组，完全移除role字段支持
+        roles[userId] = userConfig.roles || [];
       });
       setUserRoles(roles);
     }
@@ -216,7 +209,7 @@ export function UserAssignments({ data, onSuccess, onError, onDataChange, isDark
                   <div>
                     <Select
                       mode="multiple"
-                      value={isRoleValid(user.id) ? (userRoles[user.id] || ['user']) : undefined}
+                      value={userRoles[user.id] || []}
                       onChange={(value) => handleRoleChange(user.id, value)}
                       disabled={loading}
                       style={{ minWidth: 180 }}
