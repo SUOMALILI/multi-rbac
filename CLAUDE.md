@@ -6,6 +6,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 This is the **Home Assistant RBAC Middleware** - a flexible Role-Based Access Control (RBAC) middleware component for Home Assistant that intercepts service calls and enforces access control based on YAML configuration.
 
+**Current Development Status:** Migrating from V2 (single-role, mixed allow/deny) to V3 (multi-role, pure whitelist). See `/home/bee/Project/HomeAssistant/doc/rbac_plan.md` for detailed implementation plan.
+
 **Key Features:**
 - Service call interception for all Home Assistant services
 - YAML-based configuration with dynamic reload
@@ -13,6 +15,7 @@ This is the **Home Assistant RBAC Middleware** - a flexible Role-Based Access Co
 - Domain, entity, and service-level access control
 - Frontend blocking of restricted entities in quick-bar
 - Template-based role conditions using Home Assistant templates
+- **V3 Features:** Multi-role support, pure whitelist mode, admin role exemption, template condition merging
 
 ## Development Commands
 
