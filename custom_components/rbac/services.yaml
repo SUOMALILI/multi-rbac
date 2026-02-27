@@ -23,7 +23,7 @@ list_users:
 
 add_user:
   name: Add user
-  description: Add a user to the access control system with a specific role (admin only)
+  description: Add a user to the access control system with specific roles (admin only)
   fields:
     person:
       name: Person
@@ -33,13 +33,13 @@ add_user:
       selector:
         entity:
           domain: person
-    role:
-      name: Role
-      description: The role to assign to the user
+    roles:
+      name: Roles
+      description: The roles to assign to the user (array of role names)
       required: true
-      example: "admin"
+      example: '["admin", "power_user"]'
       selector:
-        text:
+        object:
 
 get_available_roles:
   name: Get available roles

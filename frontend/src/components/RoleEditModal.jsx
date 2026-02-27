@@ -23,7 +23,7 @@ export function RoleEditModal({
   const [domainRestrictions, setDomainRestrictions] = useState([]);
   const [entityRestrictions, setEntityRestrictions] = useState([]);
   const [isAdmin, setIsAdmin] = useState(false);
-  const [denyAll, setDenyAll] = useState(false);
+  const [mergeCondition, setMergeCondition] = useState(true);
   const [templateTestResult, setTemplateTestResult] = useState(null); // null, 'loading', 'true', 'false', 'error'
   const [templateTestError, setTemplateTestError] = useState('');
   const [templateValue, setTemplateValue] = useState('');
@@ -38,8 +38,7 @@ export function RoleEditModal({
       form.setFieldsValue({
         description: roleConfig.description || '',
         admin: roleConfig.admin || false,
-        deny_all: roleConfig.deny_all || false,
-        fallbackRole: roleConfig.fallbackRole || '',
+        merge_condition: roleConfig.merge_condition !== undefined ? roleConfig.merge_condition : true,
         domains: roleConfig.permissions?.domains || {},
         entities: roleConfig.permissions?.entities || {}
       });
@@ -72,7 +71,7 @@ export function RoleEditModal({
       setEntityRestrictions(entityRestrictions);
       setShowTemplate(!!roleConfig.template);
       setIsAdmin(roleConfig.admin || false);
-      setDenyAll(roleConfig.deny_all || false);
+      setMergeCondition(roleConfig.merge_condition !== undefined ? roleConfig.merge_condition : true);
       setTemplateTestResult(null);
       setTemplateTestError('');
       setTemplateValue(roleConfig.template || '');
@@ -99,8 +98,7 @@ export function RoleEditModal({
       setEntityRestrictions([]);
       setShowTemplate(false);
       setIsAdmin(false);
-      setDenyAll(false);
-      setShowConversionModal(false);
+      setMergeCondition(true);
       setTemplateTestResult(null);
       setTemplateTestError('');
       setTemplateValue('');
@@ -145,9 +143,8 @@ export function RoleEditModal({
       setDomainRestrictions([]);
       setEntityRestrictions([]);
     } else if (choice === 'cancel') {
-      // Cancel - disable deny_all and keep existing restrictions
-      setDenyAll(false);
-      form.setFieldsValue({ deny_all: false });
+      // Cancel - keep existing restrictions
+      // No deny_all in V3
     }
   };
 
@@ -176,19 +173,16 @@ export function RoleEditModal({
       const roleData = {
         description: values.description,
         admin: values.admin || false,
-        deny_all: values.deny_all || false,
+        merge_condition: values.merge_condition !== undefined ? values.merge_condition : true,
         permissions: {
           domains,
           entities
         }
       };
-      
+
       // Add template if provided
       if (showTemplate && templateValue) {
         roleData.template = templateValue;
-        if (values.fallbackRole) {
-          roleData.fallbackRole = values.fallbackRole;
-        }
       }
       
       // For new roles, include the role name
@@ -321,7 +315,7 @@ export function RoleEditModal({
     setTemplateTestResult(null);
     setTemplateEvaluatedValue(null);
     setTemplateTestError('');
-    form.setFieldsValue({ fallbackRole: '' });
+    form.setFieldsValue({ merge_condition: true });
     setShowTemplate(false); // This will hide the template section and show "Add Template" button
   };
 
@@ -453,29 +447,12 @@ export function RoleEditModal({
               {!isAdmin && (
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <Text style={{ fontSize: '14px' }}>
-                    {denyAll ? 'Deny All' : 'Allow All'}
+                    Pure Whitelist Mode
                   </Text>
-                  <Tooltip title={denyAll ? "Switch to Allow All (permit by default)" : "Switch to Deny All (block by default)"}>
-                    <Switch
-                      checked={denyAll}
-                      checkedChildren="✗"
-                      unCheckedChildren="✓"
-                      style={{
-                        backgroundColor: denyAll ? '#ff4d4f' : '#52c41a'
-                      }}
-                      onChange={(checked) => {
-                        setDenyAll(checked);
-                        form.setFieldsValue({ deny_all: checked });
-                        if (checked) {
-                          // Check if there are existing domains/entities with allow=false to convert
-                          const hasBlockingRestrictions = domainRestrictions.some(r => !r.allow) || entityRestrictions.some(r => !r.allow);
-                          if (hasBlockingRestrictions) {
-                            // Show conversion warning dialog
-                            showConversionWarning();
-                          }
-                        }
-                      }}
-                    />
+                  <Tooltip title="V3: All permissions must be explicitly allowed (no Deny All/Allow All modes)">
+                    <Tag color="blue" style={{ fontSize: '12px', padding: '2px 8px' }}>
+                      Enabled
+                    </Tag>
                   </Tooltip>
                 </div>
               )}
@@ -517,7 +494,7 @@ export function RoleEditModal({
           <Input />
         </Form.Item>
 
-        <Form.Item name="deny_all" hidden>
+        <Form.Item name="merge_condition" hidden>
           <Input />
         </Form.Item>
 
@@ -700,25 +677,19 @@ export function RoleEditModal({
             </div>
             
             <Form.Item
-              name="fallbackRole"
-              label="Fallback Role"
-              help="Role to use when template evaluates to false"
+              name="merge_condition"
+              label="Merge Condition"
+              help="When template is true, merge this role's permissions (checked) or ignore them (unchecked)"
+              initialValue={true}
             >
-              <Select 
-                showSearch
-                placeholder="Select fallback role"
-                filterOption={(input, option) =>
-                  option.children.toLowerCase().indexOf(input.toLowerCase()) >= 0
-                }
-              >
-                {availableRoles.filter(role => role !== roleName).map(role => (
-                  <Select.Option key={role} value={role}>{role}</Select.Option>
-                ))}
-              </Select>
+              <Checkbox checked={mergeCondition} onChange={(e) => setMergeCondition(e.target.checked)}>
+                Merge role permissions when template is true
+              </Checkbox>
             </Form.Item>
-            
+
             <Text type="secondary" style={{ fontSize: '12px', fontStyle: 'italic' }}>
-              When the template evaluates to false, users with this role will automatically be assigned the fallback role instead.
+              When the template evaluates to true, this role's permissions will be merged with other active roles if "Merge Condition" is checked.
+              If unchecked, the role's permissions will be ignored when template is true.
             </Text>
           </div>
         )}
@@ -936,28 +907,6 @@ export function RoleEditModal({
           </>
         )}
       </Form>
-      </Modal>
-      
-      {/* Conversion Warning Modal */}
-      <Modal
-        title="Convert Existing Restrictions?"
-        open={showConversionModal}
-        onCancel={() => handleConversionChoice('cancel')}
-        footer={[
-          <Button key="cancel" onClick={() => handleConversionChoice('cancel')}>
-            Cancel
-          </Button>,
-          <Button key="clear" onClick={() => handleConversionChoice('clear')}>
-            Clear All
-          </Button>,
-          <Button key="convert" type="primary" onClick={() => handleConversionChoice('convert')}>
-            Convert to Allow
-          </Button>
-        ]}
-      >
-        <div>
-          <p>You have blocking restrictions configured. What would you like to do?</p>
-        </div>
       </Modal>
     </>
   );

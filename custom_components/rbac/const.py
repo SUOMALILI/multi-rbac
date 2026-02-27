@@ -6,6 +6,12 @@ DOMAIN = "rbac"
 CONF_USERS = "users"
 CONF_RESTRICTIONS = "restrictions"
 
+# Configuration version
+CONFIG_VERSION = "3.0"
+
+# Admin role identifier
+ADMIN_ROLE_IDENTIFIER = "admin"
+
 # Role hierarchy (higher number = more permissions)
 ROLE_HIERARCHY = {
     "guest": 0,

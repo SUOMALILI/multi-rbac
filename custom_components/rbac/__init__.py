@@ -13,6 +13,8 @@ from homeassistant.components.sensor import SensorEntity
 from homeassistant.helpers.template import Template
 import homeassistant.helpers.config_validation as cv
 
+from .const import CONFIG_VERSION
+
 _LOGGER = logging.getLogger(__name__)
 
 DOMAIN = "rbac"
@@ -43,7 +45,7 @@ async def _load_access_control_config(hass: HomeAssistant) -> Dict[str, Any]:
         except FileNotFoundError:
             _LOGGER.info(f"Access control configuration not found at {config_path}, creating default configuration")
             default_config = {
-                "version": "2.0",
+                "version": CONFIG_VERSION,
                 "description": "RBAC Access Control Configuration",
                 "enabled": True,
                 "show_notifications": True,
@@ -87,14 +89,98 @@ async def _load_access_control_config(hass: HomeAssistant) -> Dict[str, Any]:
             return default_config
         except yaml.YAMLError as e:
             _LOGGER.error(f"Invalid YAML in access control configuration: {e}")
-            return {"default_access": "allow", "users": {}}
+            raise HomeAssistantError(f"Invalid YAML in access control configuration: {e}")
         except Exception as e:
             _LOGGER.error(f"Error loading access control configuration: {e}")
-            return {"default_access": "allow", "users": {}}
+            raise HomeAssistantError(f"Error loading access control configuration: {e}")
     
     config = await hass.async_add_executor_job(_load_file)
     _LOGGER.info(f"Loaded access control configuration from {config_path}")
+
+    # Validate configuration version and structure
+    config_version = config.get("version", "1.0")
+    if config_version != CONFIG_VERSION:
+        _LOGGER.error(f"Unsupported configuration version: {config_version}. Expected version: {CONFIG_VERSION}")
+        raise HomeAssistantError(f"Unsupported configuration version: {config_version}. Expected version: {CONFIG_VERSION}")
+
+    # Validate V3 configuration structure
+    _validate_v3_configuration(config)
+
     return config
+
+
+def _validate_v3_configuration(config: Dict[str, Any]) -> None:
+    """Validate V3 configuration structure."""
+    # Check for old configuration patterns
+    users = config.get("users", {})
+    roles = config.get("roles", {})
+
+    for user_id, user_config in users.items():
+        # Check for old single role format
+        if isinstance(user_config.get("role"), str):
+            raise HomeAssistantError(
+                f"User '{user_id}' uses old single role format. "
+                f"Please update to V3 format with 'roles' array. "
+                f"Example: roles: [\"{user_config.get('role')}\"]"
+            )
+
+        # Check for missing roles array
+        if "roles" not in user_config:
+            raise HomeAssistantError(
+                f"User '{user_id}' missing 'roles' array. "
+                f"V3 configuration requires 'roles' as an array. "
+                f"Example: roles: [\"guest\"]"
+            )
+
+        # Ensure roles is a list
+        if not isinstance(user_config.get("roles"), list):
+            raise HomeAssistantError(
+                f"User '{user_id}' has invalid 'roles' format. "
+                f"Expected array/list, got {type(user_config.get('roles'))}. "
+                f"Example: roles: [\"guest\", \"media_user\"]"
+            )
+
+    for role_name, role_config in roles.items():
+        # Check for deny_all field (old format)
+        if "deny_all" in role_config:
+            raise HomeAssistantError(
+                f"Role '{role_name}' contains deprecated 'deny_all' field. "
+                f"V3 configuration uses pure whitelist mode. "
+                f"Please remove 'deny_all' field and configure permissions explicitly."
+            )
+
+        # Check for fallbackRole field (old format)
+        if "fallbackRole" in role_config:
+            raise HomeAssistantError(
+                f"Role '{role_name}' contains deprecated 'fallbackRole' field. "
+                f"V3 configuration uses 'merge_condition' instead. "
+                f"Please replace 'fallbackRole' with 'merge_condition' (boolean)."
+            )
+
+        # Ensure admin field exists
+        if "admin" not in role_config:
+            role_config["admin"] = False
+
+        # Ensure merge_condition field exists (default to True)
+        if "merge_condition" not in role_config:
+            role_config["merge_condition"] = True
+
+        # Ensure permissions structure exists
+        if "permissions" not in role_config:
+            role_config["permissions"] = {"domains": {}, "entities": {}}
+
+        # Validate permissions structure
+        permissions = role_config["permissions"]
+        if not isinstance(permissions, dict):
+            raise HomeAssistantError(
+                f"Role '{role_name}' has invalid permissions format. "
+                f"Expected dict, got {type(permissions)}"
+            )
+
+        if "domains" not in permissions:
+            permissions["domains"] = {}
+        if "entities" not in permissions:
+            permissions["entities"] = {}
 
 
 async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
@@ -571,31 +657,27 @@ def _check_service_access_with_reason(
     access_config: Dict[str, Any],
     hass: HomeAssistant = None
 ) -> tuple[bool, str]:
-    """Check if a user has access to a specific service call with detailed reason."""
-    
+    """Check if a user has access to a specific service call with detailed reason (V3 multi-role pure whitelist)."""
+
     if not user_id or user_id == "null" or user_id is None:
         return True, "system call (no user_id)"
-    
+
     users = access_config.get("users", {})
     user_config = users.get(user_id)
-    
+
     if not user_config:
-        _LOGGER.warning(f"User {user_id} not in config, checking default restrictions")
+        # No user config - check default restrictions
         default_restrictions = access_config.get("default_restrictions", {})
-        _LOGGER.warning(f"Default restrictions: {default_restrictions}")
         if default_restrictions:
             default_domains = default_restrictions.get("domains", {})
-            _LOGGER.warning(f"Checking domain {domain} against default domains: {default_domains}")
             if domain in default_domains:
                 domain_config = default_domains[domain]
-                _LOGGER.warning(f"Found domain {domain} config: {domain_config}")
                 default_services = domain_config.get("services", [])
                 if not default_services:
-                    _LOGGER.warning(f"Domain {domain} blocks all services")
                     return False, f"domain {domain} blocked by default"
                 elif service in default_services:
                     return False, f"service {domain}.{service} blocked by default"
-            
+
             if service_data and "entity_id" in service_data:
                 entity_id = service_data["entity_id"]
                 if isinstance(entity_id, list):
@@ -617,22 +699,40 @@ def _check_service_access_with_reason(
                             return False, f"entity {entity_id} blocked by default"
                         elif service in default_entity_services:
                             return False, f"entity {entity_id} service {service} blocked by default"
-        
-        return True, f"no default restrictions"
-    
-    user_role = user_config.get("role", "unknown")
-    
+
+        # No user config and no default restrictions blocking - deny by default
+        return False, f"user {user_id} not configured, access denied by default"
+
+    # V3: Get user roles array
+    user_roles = user_config.get("roles", [])
+    if not user_roles:
+        return False, f"user {user_id} has no roles assigned, access denied by default"
+
     roles = access_config.get("roles", {})
-    role_config = roles.get(user_role, {})
-    
-    if role_config and hass:
+    reasons = []
+    final_access = False
+
+    # Check each role for access (union of all active roles)
+    for role_name in user_roles:
+        role_config = roles.get(role_name)
+        if not role_config:
+            reasons.append(f"Role {role_name} not found in configuration")
+            continue
+
+        # Check if this is an admin role (full access)
+        is_admin_role = role_config.get("admin", False)
+        if is_admin_role:
+            return True, f"admin role {role_name} has full access"
+
+        # Check template conditions and merge_condition
         template_str = role_config.get("template")
-        fallback_role = role_config.get("fallbackRole")
-        
-        if template_str and fallback_role:
+        merge_condition = role_config.get("merge_condition", True)
+        should_merge = True  # Default to merging
+
+        if template_str and hass:
             try:
                 template = Template(template_str, hass)
-                
+
                 user_person_entity = None
                 try:
                     for state in hass.states.async_all():
@@ -641,300 +741,117 @@ def _check_service_access_with_reason(
                             break
                 except Exception as e:
                     _LOGGER.debug(f"Could not find person entity for user {user_id}: {e}")
-                
+
                 template_context = {}
                 if user_person_entity:
                     template_context['current_user_str'] = user_person_entity
-                
+
                 result = template.async_render(template_context, parse_result=False)
-                
                 template_result = bool(result) if result not in [None, "", "False", "false", "0"] else False
-                
-                _LOGGER.debug(f"Template for role {user_role} evaluated to: {template_result} (raw: {result})")
-                
-                if not template_result:
-                    _LOGGER.info(f"Template for role {user_role} evaluated to false, switching to fallback role: {fallback_role}")
-                    user_role = fallback_role
-                    role_config = roles.get(user_role, {})
-                    
-                    if not role_config:
-                        _LOGGER.warning(f"Fallback role {fallback_role} not found in configuration")
-                        return True, f"fallback role {fallback_role} not found"
-            except Exception as e:
-                _LOGGER.error(f"Error evaluating template for role {user_role}: {e}")
-                _LOGGER.debug(f"Template evaluation error details: {e}", exc_info=True)
-                if fallback_role:
-                    _LOGGER.warning(f"Template evaluation failed for role {user_role}, switching to fallback role: {fallback_role}")
-                    user_role = fallback_role
-                    role_config = roles.get(user_role, {})
-                    
-                    if not role_config:
-                        _LOGGER.warning(f"Fallback role {fallback_role} not found in configuration")
-                        return True, f"fallback role {fallback_role} not found"
+
+                _LOGGER.debug(f"Template for role {role_name} evaluated to: {template_result} (raw: {result})")
+
+                # Determine if role should be merged based on template result and merge_condition
+                if (template_result and merge_condition) or (not template_result and not merge_condition):
+                    should_merge = True
                 else:
-                    _LOGGER.error(f"No fallback role defined for role {user_role}, continuing with original role")
+                    should_merge = False
+                    reasons.append(f"Role {role_name} conditions not met (template: {template_result}, merge_condition: {merge_condition})")
+
+            except Exception as e:
+                _LOGGER.error(f"Error evaluating template for role {role_name}: {e}")
+                _LOGGER.debug(f"Template evaluation error details: {e}", exc_info=True)
+                should_merge = False  # Template error - don't merge for safety
+                reasons.append(f"Role {role_name} template error")
+
+        # Check role permissions if role should be merged
+        if should_merge:
+            role_access, reason = _check_single_role_whitelist_access(
+                role_config, domain, service, service_data, access_config, role_name
+            )
+            if role_access:
+                final_access = True
+                reasons.append(f"Allowed by role {role_name}: {reason}")
+                break  # Already have access, no need to check other roles
+            else:
+                reasons.append(f"Denied by role {role_name}: {reason}")
+        else:
+            reasons.append(f"Role {role_name} not merged due to conditions")
+
+    # Default deny if no role granted access
+    if not final_access:
+        return False, f"Access denied. Reasons: {' | '.join(reasons)}"
+
+    return final_access, f"Access granted: {' | '.join(reasons)}"
     
-    if not role_config:
-        return True, f"no role configuration for {user_role}"
-    
-    is_admin_role = role_config.get("admin", False)
-    if is_admin_role:
-        return True, f"admin role {user_role} has full access"
-    
-    deny_all = role_config.get("deny_all", False)
-    
+def _check_single_role_whitelist_access(
+    role_config: Dict[str, Any],
+    domain: str,
+    service: str,
+    service_data: Optional[Dict[str, Any]],
+    access_config: Dict[str, Any],
+    role_name: str
+) -> tuple[bool, str]:
+    """Check if a single role allows access to a service (pure whitelist mode)."""
+
     default_restrictions = access_config.get("default_restrictions", {})
     permissions = role_config.get("permissions", {})
+    # Pure whitelist mode - only check if explicitly allowed
     if service_data and "entity_id" in service_data:
         entity_id = service_data["entity_id"]
-        if isinstance(entity_id, list):
-            for eid in entity_id:
-                # Check default entity restrictions
-                default_entities = default_restrictions.get("entities", {})
-                if eid in default_entities:
-                    default_entity_config = default_entities[eid]
-                    default_entity_services = default_entity_config.get("services", [])
-                    default_entity_allow = default_entity_config.get("allow", False)
-                    
-                    if default_entity_allow:
-                        # Default allow rule: check if service is in allowed services
-                        if not default_entity_services or service in default_entity_services:
-                            return True, f"entity {eid} service {service} allowed by default"
-                        else:
-                            return False, f"entity {eid} service {service} not in default allow list"
-                    else:
-                        # Default block rule
-                        if not default_entity_services:  # Default blocks all services
-                            # Check if role allows this entity
-                            role_entities = permissions.get("entities", {})
-                            if eid not in role_entities:
-                                return False, f"entity {eid} blocked by default restrictions"
-                            role_entity_config = role_entities[eid]
-                            role_entity_services = role_entity_config.get("services", [])
-                            role_entity_allow = role_entity_config.get("allow", False)
-                            
-                            if role_entity_allow:
-                                # Role allow rule: check if service is in allowed services
-                                if not role_entity_services or service in role_entity_services:
-                                    return True, f"entity {eid} service {service} allowed by role {user_role}"
-                                else:
-                                    return False, f"entity {eid} service {service} not in role allow list"
-                            else:
-                                # Role block rule
-                                if not role_entity_services:  # Role also blocks all services
-                                    return False, f"entity {eid} blocked by role {user_role}"
-                                elif service not in role_entity_services:  # Service not in role's allowed list
-                                    return False, f"entity {eid} service {service} not allowed by role {user_role}"
-                        elif service in default_entity_services:  # Default blocks specific service
-                            # Check if role allows this service
-                            role_entities = permissions.get("entities", {})
-                            if eid not in role_entities:
-                                return False, f"entity {eid} service {service} blocked by default restrictions"
-                            role_entity_config = role_entities[eid]
-                            role_entity_services = role_entity_config.get("services", [])
-                            role_entity_allow = role_entity_config.get("allow", False)
-                            
-                            if role_entity_allow:
-                                # Role allow rule: check if service is in allowed services
-                                if not role_entity_services or service in role_entity_services:
-                                    return True, f"entity {eid} service {service} allowed by role {user_role}"
-                                else:
-                                    return False, f"entity {eid} service {service} not in role allow list"
-                            else:
-                                # Role block rule
-                                if service in role_entity_services:  # Role also blocks this service
-                                    return False, f"entity {eid} service {service} blocked by role {user_role}"
-                
-                # Check role-specific entity restrictions (always check, even if no default restrictions)
-                role_entities = permissions.get("entities", {})
-                if eid in role_entities:
-                    role_entity_config = role_entities[eid]
-                    role_entity_services = role_entity_config.get("services", [])
-                    role_entity_allow = role_entity_config.get("allow", False)
-                    
-                    _LOGGER.warning(f"Found entity {eid} in role permissions: allow={role_entity_allow}, services={role_entity_services}")
-                    
-                    if role_entity_allow:
-                        # Role allow rule: check if service is in allowed services
-                        if not role_entity_services or service in role_entity_services:
-                            return True, f"entity {eid} service {service} allowed by role {user_role}"
-                        else:
-                            return False, f"entity {eid} service {service} not in role allow list"
-                    else:
-                        # Role block rule
-                        if not role_entity_services:  # Role blocks all services for this entity
-                            return False, f"entity {eid} blocked by role {user_role}"
-                        elif service in role_entity_services:  # Role blocks specific service
-                            return False, f"entity {eid} service {service} blocked by role {user_role}"
-        else:
-            # Same logic for single entity
-            default_entities = default_restrictions.get("entities", {})
-            if entity_id in default_entities:
-                default_entity_config = default_entities[entity_id]
-                default_entity_services = default_entity_config.get("services", [])
-                default_entity_allow = default_entity_config.get("allow", False)
-                
-                if default_entity_allow:
-                    # Default allow rule: check if service is in allowed services
-                    if not default_entity_services or service in default_entity_services:
-                        return True, f"entity {entity_id} service {service} allowed by default"
-                    else:
-                        return False, f"entity {entity_id} service {service} not in default allow list"
-                else:
-                    # Default block rule
-                    if not default_entity_services:  # Default blocks all services
-                        role_entities = permissions.get("entities", {})
-                        if entity_id not in role_entities:
-                            return False, f"entity {entity_id} blocked by default restrictions"
-                        role_entity_config = role_entities[entity_id]
-                        role_entity_services = role_entity_config.get("services", [])
-                        role_entity_allow = role_entity_config.get("allow", False)
-                        
-                        if role_entity_allow:
-                            # Role allow rule: check if service is in allowed services
-                            if not role_entity_services or service in role_entity_services:
-                                return True, f"entity {entity_id} service {service} allowed by role {user_role}"
-                            else:
-                                return False, f"entity {entity_id} service {service} not in role allow list"
-                        else:
-                            # Role block rule
-                            if not role_entity_services:  # Role also blocks all services
-                                return False, f"entity {entity_id} blocked by role {user_role}"
-                            elif service not in role_entity_services:  # Service not in role's allowed list
-                                return False, f"entity {entity_id} service {service} not allowed by role {user_role}"
-                    elif service in default_entity_services:  # Default blocks specific service
-                        role_entities = permissions.get("entities", {})
-                        if entity_id not in role_entities:
-                            return False, f"entity {entity_id} service {service} blocked by default restrictions"
-                        role_entity_config = role_entities[entity_id]
-                        role_entity_services = role_entity_config.get("services", [])
-                        role_entity_allow = role_entity_config.get("allow", False)
-                        
-                        if role_entity_allow:
-                            # Role allow rule: check if service is in allowed services
-                            if not role_entity_services or service in role_entity_services:
-                                return True, f"entity {entity_id} service {service} allowed by role {user_role}"
-                            else:
-                                return False, f"entity {entity_id} service {service} not in role allow list"
-                        else:
-                            # Role block rule
-                            if service in role_entity_services:  # Role also blocks this service
-                                return False, f"entity {entity_id} service {service} blocked by role {user_role}"
-            
-            # Check role-specific entity restrictions (always check, even if no default restrictions)
-            role_entities = permissions.get("entities", {})
-            if entity_id in role_entities:
-                role_entity_config = role_entities[entity_id]
-                role_entity_services = role_entity_config.get("services", [])
-                role_entity_allow = role_entity_config.get("allow", False)
-                
-                _LOGGER.warning(f"Found single entity {entity_id} in role permissions: allow={role_entity_allow}, services={role_entity_services}")
-                
-                if role_entity_allow:
-                    # Role allow rule: check if service is in allowed services
-                    if not role_entity_services or service in role_entity_services:
-                        return True, f"entity {entity_id} service {service} allowed by role {user_role}"
-                    else:
-                        return False, f"entity {entity_id} service {service} not in role allow list"
-                else:
-                    # Role block rule
-                    if not role_entity_services:  # Role blocks all services for this entity
-                        return False, f"entity {entity_id} blocked by role {user_role}"
-                    elif service in role_entity_services:  # Role blocks specific service
-                        return False, f"entity {entity_id} service {service} blocked by role {user_role}"
-
-    default_domains = default_restrictions.get("domains", {})
-    role_domains = permissions.get("domains", {})
-    
-    if domain in default_domains:
-        default_config = default_domains[domain]
-        default_services = default_config.get("services", [])
-        default_allow = default_config.get("allow", False)
-        
-        if default_allow:
-            if not default_services or service in default_services:
-                return True, f"domain {domain} service {service} allowed by default"
-            else:
-                return False, f"domain {domain} service {service} not in default allow list"
-        else:
-            if not default_services:
-                if domain not in role_domains:
-                    return False, f"domain {domain} blocked by default restrictions"
-                role_config = role_domains[domain]
-                role_services = role_config.get("services", [])
-                role_allow = role_config.get("allow", False)
-                
-                if role_allow:
-                    if not role_services or service in role_services:
-                        return True, f"domain {domain} service {service} allowed by role {user_role}"
-                    else:
-                        return False, f"domain {domain} service {service} not in role allow list"
-                else:
-                    if not role_services:
-                        return False, f"domain {domain} blocked by role {user_role}"
-                    elif service not in role_services:
-                        return False, f"service {domain}.{service} not allowed by role {user_role}"
-            elif service in default_services:
-                if domain not in role_domains:
-                    return False, f"service {domain}.{service} blocked by default restrictions"
-                role_config = role_domains[domain]
-                role_services = role_config.get("services", [])
-                role_allow = role_config.get("allow", False)
-                
-                if role_allow:
-                    if not role_services or service in role_services:
-                        return True, f"domain {domain} service {service} allowed by role {user_role}"
-                    else:
-                        return False, f"domain {domain} service {service} not in role allow list"
-                else:
-                    if service in role_services:
-                        return False, f"service {domain}.{service} blocked by role {user_role}"
-    
-    if domain in role_domains:
-        role_config = role_domains[domain]
-        role_services = role_config.get("services", [])
-        role_allow = role_config.get("allow", False)
-        
-        _LOGGER.warning(f"Found domain {domain} in role permissions: allow={role_allow}, services={role_services}")
-        
-        if role_allow:
-            if not role_services or service in role_services:
-                return True, f"domain {domain} service {service} allowed by role {user_role}"
-            else:
-                return False, f"domain {domain} service {service} not in role allow list"
-        else:
-            if not role_services:
-                return False, f"domain {domain} blocked by role {user_role}"
-            elif service in role_services:
-                return False, f"service {domain}.{service} blocked by role {user_role}"
-    
-    if deny_all and not ((domain == "system_log" and service == "write") or (domain == "browser_mod" and service == "notification")):
         entity_ids = []
-        
-        if service_data and "entity_id" in service_data:
-            entity_id = service_data["entity_id"]
-            if isinstance(entity_id, str):
-                entity_ids = [entity_id]
-            else:
-                entity_ids = entity_id if isinstance(entity_id, list) else []
-        
-        if domain in ["script", "automation"]:
-            entity_name = f"{domain}.{service}"
-            entity_ids.append(entity_name)
-        
+
+        if isinstance(entity_id, list):
+            entity_ids = entity_id
+        else:
+            entity_ids = [entity_id]
+
+        # Check entity-level permissions first (higher priority)
         role_entities = permissions.get("entities", {})
         for eid in entity_ids:
             if eid in role_entities:
                 entity_config = role_entities[eid]
-                entity_allow = entity_config.get("allow", False)
-                if entity_allow:
-                    entity_services = entity_config.get("services", [])
-                    if not entity_services or service in entity_services:
-                        return True, f"entity {eid} service {service} allowed by role entity permissions (overrides deny_all)"
-        
-        return False, f"access denied by deny_all setting for role {user_role}"
-    
-    return True, f"access granted"
+                entity_services = entity_config.get("services", [])
+                # In pure whitelist mode, entity config means allowed
+                if not entity_services or service in entity_services:
+                    return True, f"entity {eid} service {service} allowed by role {role_name}"
+                else:
+                    return False, f"entity {eid} service {service} not in allowed services list for role {role_name}"
+
+        # Check default entity restrictions
+        default_entities = default_restrictions.get("entities", {})
+        for eid in entity_ids:
+            if eid in default_entities:
+                default_entity_config = default_entities[eid]
+                default_entity_services = default_entity_config.get("services", [])
+                if not default_entity_services:
+                    return False, f"entity {eid} blocked by default restrictions"
+                elif service in default_entity_services:
+                    return False, f"entity {eid} service {service} blocked by default restrictions"
+
+    # Check domain-level permissions
+    role_domains = permissions.get("domains", {})
+    if domain in role_domains:
+        domain_config = role_domains[domain]
+        domain_services = domain_config.get("services", [])
+        # In pure whitelist mode, domain config means allowed
+        if not domain_services or service in domain_services:
+            return True, f"domain {domain} service {service} allowed by role {role_name}"
+        else:
+            return False, f"domain {domain} service {service} not in allowed services list for role {role_name}"
+
+    # Check default domain restrictions
+    default_domains = default_restrictions.get("domains", {})
+    if domain in default_domains:
+        default_config = default_domains[domain]
+        default_services = default_config.get("services", [])
+        if not default_services:
+            return False, f"domain {domain} blocked by default restrictions"
+        elif service in default_services:
+            return False, f"service {domain}.{service} blocked by default restrictions"
+
+    # No explicit permission found - deny by default in pure whitelist mode
+    return False, f"no permission found for {domain}.{service} in role {role_name}"
 
 
 def _check_service_access(
@@ -1051,14 +968,14 @@ async def reload_access_config(hass: HomeAssistant) -> bool:
 
 
 def _is_top_level_user(hass: HomeAssistant, user_id: str) -> bool:
-    """Check if user has top-level access (admin or super_admin role)."""
+    """Check if user has top-level access (admin role)."""
     if DOMAIN not in hass.data:
         return False
-    
+
     access_config = hass.data[DOMAIN].get("access_config", {})
     users = access_config.get("users", {})
     user_config = users.get(user_id)
-    
+
     if not user_config:
         try:
             user = hass.auth.async_get_user(user_id)
@@ -1067,9 +984,17 @@ def _is_top_level_user(hass: HomeAssistant, user_id: str) -> bool:
         except Exception:
             pass
         return False
-    
-    role = user_config.get("role", "")
-    return role in ["admin", "super_admin"]
+
+    # V3: Check if any of the user's roles has admin: true
+    user_roles = user_config.get("roles", [])
+    roles = access_config.get("roles", {})
+
+    for role_name in user_roles:
+        role_config = roles.get(role_name)
+        if role_config and role_config.get("admin", False):
+            return True
+
+    return False
 
 
 async def _save_access_control_config(hass: HomeAssistant, config: Dict[str, Any]) -> bool:
@@ -1210,23 +1135,24 @@ async def _register_sidebar_panel(hass: HomeAssistant):
 
 
 async def add_user_access(hass: HomeAssistant, user_id: str, role: str) -> bool:
-    """Add a user to the access control configuration."""
+    """Add a user to the access control configuration (legacy single role)."""
     if DOMAIN not in hass.data:
         return False
-    
+
     access_config = hass.data[DOMAIN].get("access_config", {})
     if "users" not in access_config:
         access_config["users"] = {}
-    
+
+    # V3: Convert single role to roles array
     access_config["users"][user_id] = {
-        "role": role
+        "roles": [role]
     }
-    
+
     if await _save_access_control_config(hass, access_config):
         hass.data[DOMAIN]["access_config"] = access_config
-        _LOGGER.info(f"Added user '{user_id}' with role '{role}'")
+        _LOGGER.info(f"Added user '{user_id}' with role '{role}' (converted to V3 format)")
         return True
-    
+
     return False
 
 
@@ -1250,21 +1176,22 @@ async def remove_user_access(hass: HomeAssistant, user_id: str) -> bool:
 
 
 async def update_user_role(hass: HomeAssistant, user_id: str, role: str) -> bool:
-    """Update a user's role in the access control configuration."""
+    """Update a user's role in the access control configuration (legacy single role)."""
     if DOMAIN not in hass.data:
         return False
-    
+
     access_config = hass.data[DOMAIN].get("access_config", {})
     users = access_config.get("users", {})
-    
+
     if user_id in users:
-        users[user_id]["role"] = role
-        
+        # V3: Convert single role to roles array for backward compatibility
+        users[user_id]["roles"] = [role]
+
         if _save_access_control_config(hass, access_config):
             hass.data[DOMAIN]["access_config"] = access_config
-            _LOGGER.info(f"Updated user '{user_id}' role to '{role}'")
+            _LOGGER.info(f"Updated user '{user_id}' role to '{role}' (converted to V3 format)")
             return True
-    
+
     return False
 
 

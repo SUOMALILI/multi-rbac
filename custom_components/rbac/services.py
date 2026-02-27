@@ -60,7 +60,7 @@ LIST_USERS_SCHEMA = vol.Schema({})
 # User management schemas (restricted to top-level users)
 ADD_USER_SCHEMA = vol.Schema({
     vol.Required("person"): cv.string,
-    vol.Required("role"): cv.string,
+    vol.Required("roles"): vol.All(cv.ensure_list, [cv.string]),
 })
 
 GET_AVAILABLE_ROLES_SCHEMA = vol.Schema({})
@@ -153,7 +153,11 @@ async def async_setup_services(hass: HomeAssistant) -> None:
         user_list = []
         if users:
             for user_id, user_config in users.items():
-                role = user_config.get("role", "unknown")
+                # V3: Get roles array, fallback to single role for backward compatibility
+                roles = user_config.get("roles", [])
+                if not roles and "role" in user_config:
+                    roles = [user_config.get("role", "unknown")]
+                role = roles[0] if roles else "unknown"
                 access = user_config.get("access", "allow")
                 user_list.append({
                     "user_id": user_id,
@@ -179,15 +183,17 @@ async def async_setup_services(hass: HomeAssistant) -> None:
     async def handle_add_user(call: ServiceCall) -> Dict[str, Any]:
         """Handle the add_user service call."""
         person_entity_id = call.data.get("person", "")
-        role = call.data.get("role", "")
-        
-        # Validate role
-        if not role:
+        roles = call.data.get("roles", [])
+
+        # Validate roles
+        if not roles:
             raise HomeAssistantError("Role is required")
         
-        if not _validate_role(hass, role):
-            available_roles = _get_available_roles(hass)
-            raise HomeAssistantError(f"Invalid role '{role}'. Available roles: {', '.join(available_roles)}")
+        # Validate all roles
+        available_roles = _get_available_roles(hass)
+        invalid_roles = [role for role in roles if not _validate_role(hass, role)]
+        if invalid_roles:
+            raise HomeAssistantError(f"Invalid roles '{', '.join(invalid_roles)}'. Available roles: {', '.join(available_roles)}")
         
         # Extract user_id from person entity
         try:
@@ -230,15 +236,16 @@ async def async_setup_services(hass: HomeAssistant) -> None:
                 "message": f"Cannot add built-in Home Assistant user: {user_id}"
             }
         
-        success = await add_user_access(hass, user_id, role)
-        
+        # V3: Use first role for backward compatibility with add_user_access
+        success = await add_user_access(hass, user_id, roles[0] if roles else "user")
+
         if success:
-            _LOGGER.info(f"Added user '{user_id}' with role '{role}'")
+            _LOGGER.info(f"Added user '{user_id}' with roles '{roles}'")
             return {
                 "success": True,
                 "user_id": user_id,
-                "role": role,
-                "message": f"Successfully added user '{user_id}' with role '{role}'"
+                "roles": roles,
+                "message": f"Successfully added user '{user_id}' with roles '{', '.join(roles)}'"
             }
         else:
             _LOGGER.error(f"Failed to add user '{user_id}'")
@@ -533,19 +540,22 @@ class RBACConfigView(HomeAssistantView):
                         if user_config.get("role") == role_name:
                             user_config["role"] = "user"  # Default role
                             
-            elif action == "assign_user_role":
+            elif action == "assign_user_roles":
                 user_id = data.get("userId")
-                role_name = data.get("roleName")
-                
-                if not user_id or not role_name:
-                    return self.json({"error": "Missing userId or roleName"}, status_code=400)
-                
-                # Assign role to user
+                roles = data.get("roles")
+
+                if not user_id or not roles:
+                    return self.json({"error": "Missing userId or roles"}, status_code=400)
+
+                if not isinstance(roles, list):
+                    return self.json({"error": "roles must be an array"}, status_code=400)
+
+                # Assign roles to user
                 if "users" not in access_config:
                     access_config["users"] = {}
                 if user_id not in access_config["users"]:
                     access_config["users"][user_id] = {}
-                access_config["users"][user_id]["role"] = role_name
+                access_config["users"][user_id]["roles"] = roles
                 
             elif action == "update_default_restrictions":
                 restrictions = data.get("restrictions")
@@ -1053,22 +1063,18 @@ class RBACFrontendBlockingView(HomeAssistantView):
                     "services": []
                 })
             
-            # Check if role has deny_all enabled
-            deny_all = role_config.get("deny_all", False)
-            if deny_all:
-                # In deny_all mode, we need to get all available domains/entities
-                # and only allow those explicitly marked with allow: true
-                hass = request.app["hass"]
-                
-                # Get all available domains and entities
-                all_available_domains = set()
-                all_available_entities = set()
-                
-                # Get domains from all states
-                for state in hass.states.async_all():
-                    domain = state.entity_id.split('.')[0]
-                    all_available_domains.add(domain)
-                    all_available_entities.add(state.entity_id)
+            # V3: Pure whitelist mode - only show explicitly allowed domains/entities
+            hass = request.app["hass"]
+
+            # Get all available domains and entities
+            all_available_domains = set()
+            all_available_entities = set()
+
+            # Get domains from all states
+            for state in hass.states.async_all():
+                domain = state.entity_id.split('.')[0]
+                all_available_domains.add(domain)
+                all_available_entities.add(state.entity_id)
                 
                 # Get domains from services
                 for domain in hass.services.async_services():
@@ -1157,8 +1163,8 @@ class RBACFrontendBlockingView(HomeAssistantView):
             user_domains = user_restrictions.get("domains", {})
             user_entities = user_restrictions.get("entities", {})
             
-            # Check if role allows by default (opposite of deny_all)
-            role_allows_by_default = not role_config.get("deny_all", False)
+            # V3: Pure whitelist mode - role never allows by default
+            role_allows_by_default = False
             
             # Get all available domains and entities from Home Assistant
             all_available_domains = set()

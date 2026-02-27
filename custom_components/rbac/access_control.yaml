@@ -1,5 +1,5 @@
-version: '2.0'
-description: RBAC Access Control Configuration
+version: '3.0'
+description: RBAC Access Control Configuration (V3 - Pure Whitelist Multi-Role)
 enabled: true
 show_notifications: true
 send_event: false
@@ -33,8 +33,26 @@ default_restrictions:
 users: {}
 roles:
   admin:
-    description: Administrator with most permissions
+    description: Administrator with full access
+    admin: true
+    permissions:
+      domains: {}
+      entities: {}
+    template: ""
+    merge_condition: true
   user:
     description: Standard user with limited permissions
+    admin: false
+    permissions:
+      domains: {}
+      entities: {}
+    template: ""
+    merge_condition: true
   guest:
     description: Guest with minimal permissions
+    admin: false
+    permissions:
+      domains: {}
+      entities: {}
+    template: ""
+    merge_condition: true

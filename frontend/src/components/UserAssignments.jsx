@@ -26,7 +26,15 @@ export function UserAssignments({ data, onSuccess, onError, onDataChange, isDark
     if (data.config?.users) {
       const roles = {};
       Object.entries(data.config.users).forEach(([userId, userConfig]) => {
-        roles[userId] = userConfig.role || 'user';
+        // V3: roles is now an array, fallback to single role for backward compatibility
+        if (Array.isArray(userConfig.roles)) {
+          roles[userId] = userConfig.roles;
+        } else if (userConfig.role) {
+          // Legacy single role format
+          roles[userId] = [userConfig.role];
+        } else {
+          roles[userId] = ['user'];
+        }
       });
       setUserRoles(roles);
     }
@@ -34,10 +42,14 @@ export function UserAssignments({ data, onSuccess, onError, onDataChange, isDark
 
   // Check if user has an admin role
   const isUserAdmin = (user) => {
-    const roleName = userRoles[user.id];
-    if (!roleName || !data.config?.roles) return false;
-    const role = data.config.roles[roleName];
-    return role?.admin === true;
+    const roleNames = userRoles[user.id] || [];
+    if (!roleNames.length || !data.config?.roles) return false;
+
+    // Check if any of the user's roles has admin: true
+    return roleNames.some(roleName => {
+      const role = data.config.roles[roleName];
+      return role?.admin === true;
+    });
   };
 
   // Get admin glow styles
@@ -54,33 +66,33 @@ export function UserAssignments({ data, onSuccess, onError, onDataChange, isDark
     };
   };
 
-  const handleRoleChange = async (userId, newRole) => {
+  const handleRoleChange = async (userId, newRoles) => {
     setLoading(true);
     try {
       const response = await makeAuthenticatedRequest('/api/rbac/config', {
         method: 'POST',
         body: JSON.stringify({
-          action: 'assign_user_role',
+          action: 'assign_user_roles',
           userId: userId,
-          roleName: newRole
+          roles: newRoles
         })
       });
 
       if (!response.ok) {
-        throw new Error('Failed to assign role');
+        throw new Error('Failed to assign roles');
       }
 
       // Update local state
-      const updatedUserRoles = { ...userRoles, [userId]: newRole };
+      const updatedUserRoles = { ...userRoles, [userId]: newRoles };
       setUserRoles(updatedUserRoles);
-      
+
       // Update parent data
       const updatedUsers = { ...data.config?.users || {} };
       if (!updatedUsers[userId]) {
         updatedUsers[userId] = {};
       }
-      updatedUsers[userId].role = newRole;
-      
+      updatedUsers[userId].roles = newRoles;
+
       onDataChange({
         ...data,
         config: {
@@ -91,9 +103,10 @@ export function UserAssignments({ data, onSuccess, onError, onDataChange, isDark
 
       const user = data.users.find(u => u.id === userId);
       const userName = user ? user.name : userId;
-      onSuccess(`Role "${newRole}" assigned to ${userName} successfully!`);
+      const roleNames = newRoles.join(', ');
+      onSuccess(`Roles "${roleNames}" assigned to ${userName} successfully!`);
     } catch (error) {
-      console.error('Error assigning role:', error);
+      console.error('Error assigning roles:', error);
       onError(error.message);
     } finally {
       setLoading(false);
@@ -110,9 +123,10 @@ export function UserAssignments({ data, onSuccess, onError, onDataChange, isDark
   };
 
   const isRoleValid = (userId) => {
-    const userRole = userRoles[userId];
+    const userRolesList = userRoles[userId] || [];
     const availableRoles = getAvailableRoles();
-    return availableRoles.includes(userRole);
+    // All user roles must be in available roles
+    return userRolesList.every(role => availableRoles.includes(role));
   };
 
   const getUserDisplayName = (user) => {
@@ -201,13 +215,15 @@ export function UserAssignments({ data, onSuccess, onError, onDataChange, isDark
                   {/* Role Selector - Right Aligned */}
                   <div>
                     <Select
-                      value={isRoleValid(user.id) ? (userRoles[user.id] || 'user') : undefined}
+                      mode="multiple"
+                      value={isRoleValid(user.id) ? (userRoles[user.id] || ['user']) : undefined}
                       onChange={(value) => handleRoleChange(user.id, value)}
                       disabled={loading}
-                      style={{ minWidth: 120 }}
+                      style={{ minWidth: 180 }}
                       size="small"
                       status={isRoleValid(user.id) ? '' : 'error'}
-                      placeholder={isRoleValid(user.id) ? undefined : 'Select Role...'}
+                      placeholder={isRoleValid(user.id) ? undefined : 'Select Roles...'}
+                      maxTagCount={2}
                     >
                       {getAvailableRoles().map(role => (
                         <Select.Option key={role} value={role}>

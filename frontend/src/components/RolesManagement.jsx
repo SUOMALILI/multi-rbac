@@ -371,13 +371,6 @@ export function RolesManagement({ data, onSuccess, onError, onDataChange }) {
                         </Tag>
                       </Tooltip>
                     )}
-                    {role.deny_all && (
-                      <Tooltip title="Deny All mode enabled - blocks by default">
-                        <Tag color="red">
-                          Deny All
-                        </Tag>
-                      </Tooltip>
-                    )}
                     {Object.keys(role.permissions?.domains || {}).length > 0 && (
                       <Tooltip 
                         title={
