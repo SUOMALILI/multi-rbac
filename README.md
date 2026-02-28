@@ -1,170 +1,82 @@
 <p align="center">
-  <img src="https://raw.githubusercontent.com/SamAthanas/user-rbac/main/logo.png" alt="Home Assistant RBAC Logo" width="180" />
+  <img src="https://github.com/SUOMALILI/multi-rbac/raw/main/logo.png" alt="Home Assistant RBAC Logo" width="180" />
 </p>
 
-<h1 align="center">🏠 Home Assistant RBAC Middleware</h1>
+<h1 align="center">🏠 Home Assistant Multi-RBAC Middleware (Dev)</h1>
 
 <p align="center">
-  Finally, a flexible Role-Based Access Control (RBAC) middleware component for Home Assistant that intercepts service calls and enforces access control based on YAML configuration.<br>
-  Configure roles and user permissions using the fancy GUI editor, or configure in the YAML file directly.
-</p>
 
-## 📸 Gallery
+<strong>更强大、更灵活的多角色访问控制方案。</strong>
 
-<div align="center">
-  <table>
-    <tr>
-      <td align="center">
-        <a href="https://raw.githubusercontent.com/SamAthanas/user-rbac/main/screenshots/editing-role.png" target="_blank">
-          <img src="https://raw.githubusercontent.com/SamAthanas/user-rbac/main/screenshots/editing-role.png" alt="Role Editing" width="350"/>
-        </a>
-        <br><strong>Role Editing</strong>
-        <br><em>Detailed role configuration and permission settings</em>
-      </td>
-      <td align="center">
-        <a href="https://raw.githubusercontent.com/SamAthanas/user-rbac/main/screenshots/editing-guest-role.png" target="_blank">
-          <img src="https://raw.githubusercontent.com/SamAthanas/user-rbac/main/screenshots/editing-guest-role.png" alt="Guest Role Configuration" width="350"/>
-        </a>
-        <br><strong>Guest Role Configuration</strong>
-        <br><em>Guest user role with template condition</em>
-      </td>
-    </tr>
-    <tr>
-      <td align="center">
-        <a href="https://raw.githubusercontent.com/SamAthanas/user-rbac/main/screenshots/role-management.png" target="_blank">
-          <img src="https://raw.githubusercontent.com/SamAthanas/user-rbac/main/screenshots/role-management.png" alt="Role Management" width="350"/>
-        </a>
-        <br><strong>Role Management</strong>
-        <br><em>Overview of all configured roles and their settings</em>
-      </td>
-      <td align="center">
-        <a href="https://raw.githubusercontent.com/SamAthanas/user-rbac/main/screenshots/user-role-assignment.png" target="_blank">
-          <img src="https://raw.githubusercontent.com/SamAthanas/user-rbac/main/screenshots/user-role-assignment.png" alt="User Role Assignment" width="350"/>
-        </a>
-        <br><strong>User Role Assignment</strong>
-        <br><em>Assigning roles to Home Assistant users</em>
-      </td>
-    </tr>
-    <tr>
-      <td align="center">
-        <a href="https://raw.githubusercontent.com/SamAthanas/user-rbac/main/screenshots/settings-and-default-restrictions.png" target="_blank">
-          <img src="https://raw.githubusercontent.com/SamAthanas/user-rbac/main/screenshots/settings-and-default-restrictions.png" alt="Settings and Default Restrictions" width="350"/>
-        </a>
-        <br><strong>Settings and Default Restrictions</strong>
-        <br><em>System-wide settings and default access controls</em>
-      </td>
-      <td align="center">
-        <a href="https://raw.githubusercontent.com/SamAthanas/user-rbac/main/screenshots/deny-log.png" target="_blank">
-          <img src="https://raw.githubusercontent.com/SamAthanas/user-rbac/main/screenshots/deny-log.png" alt="Deny Log" width="350"/>
-        </a>
-        <br><strong>Deny Log</strong>
-        <br><em>Track and monitor denied access attempts</em>
-      </td>
-    </tr>
-  </table>
-</div>
-
-## ⚠️ Notice:
-
-This application is under active development and is not stable yet!
-Its ideal for users who want to experiment with basic role based access, and restrict others from being able to call specific actions on your home server. (Perhaps this will finally put an end to people expoiting the search feature or widgets to call actions that are not on your dashboard!) This component has been tested on my own instance quite a bit, but there will likely be some bugs that remain. Feel free to contribute directly or raise an issue if there is something you would like tweaked.
-
-Due to the nature of this application patching core functions, its possible that it will break in future updates of home assistant. If this occurs, you may disable the component until its updated to work with the latest version. Disabling the component will cause home assistant to return back to its normal state, without any of the rbac blocking features.
-
-## ✨ Features
-
-- **Service Call Interception**: Automatically intercepts all Home Assistant service calls.
-- **YAML-Based Configuration**: Ability to define access control rules in a YAML file.
-- **Modernized Frontend for Configuration**: Alternatively use the admin frontend to configure the access control rules.
-- **Domain and Entity Level Control**: Restrict access at both domain and entity levels.
-- **Action/Service call Control**: Restrict actions on specific domains or entities, or restrict all actions tied to an entity.
-- **Allow All and Deny All settings supported**: Configure roles to allow everything, with specific blocked entities or block everything, with specific allowed entities.
-- **Frontend Blocking**: Remove blocked entities from the native HA quickbar
-- **Dynamic Configuration**: Reload configuration without restarting Home Assistant
-- **Notifications+Events**: Persistant notifications and events are sent when system denies action call.
-- **Service Management**: Built-in services to manage and inspect configuration.
-- **Deploy Scripts for Development**: vs-code scripts included to auto ssh into server to copy files based on .env variables, and auto restarts HA after deployment for streamlined dev workflow.
-
-## 🚀 Installation
-
-### HACS Store
-
-[![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=SamAthanas&category=Integration&repository=user-rbac)
-
-> After installation, restart home assistant and add the RBAC Middleware Service. Configure the settings in the side panel.
-
----
-
-### (Manual Method)
-
-- Copy the files to your server first
-  - Component: custom_components/rbac
-  - Frontend Script (Add to resources, Javascript Module): /api/rbac/static/rbac.js
-- OR utilize the deploy.sh script to deploy to your instance directly. this requires setting up a .env file in the root of this project to configure your ssh settings
-- Search for the 'RBAC' (Role Based Access Control) Integration and install it
-- Ensure you are logged in as an admin user, and then access this page <YOUR_HA_DOMAIN>/api/rbac/static/config.html
-- Configure Roles and Role Assignments
-- Changes to the config take effect immediantly without any restart needed
-- Test with users to ensure denied action calls are blocked
-
-## 💡 Creative Ideas
-
-- Restrict non household users to sensitive domains like 'light', 'camera', or home assistant shutdown services
-- Create a guest role that utilizes the current user context in a template to determine if they should have access to your homes entities based on if they are within proximity of your house ('Guest' role is used when they are not at 'home', 'User' role is used if they are at home) {{ states[current_user_str].state != 'home'}}
-
-## 📝 Notes
-
-- Admin users or users assigned an admin role will be able to access the RBAC configuration page
-- Its possible to assign templates to each role. Templates will be evaluated each time a user that has that role executes a service call. The template will determine if the users role should be used (merge_condition: true) or ignored (merge_condition: false). This makes it possible to create more complex auth systems based on current states from your HA instance.
-- Default domain/enttiy blocklists are supported. Any non-admin user will always have these restrictions enforced.
-- Frontend is built using Preact that compiles into a static page, for easier state management and component isolation.
-
-## 💡 Future Ideas
-
-> **Note:** The following are some future ideas for this project. Not all of these may be possible to implement.
-
-- Add an option to create a temporary guest page to grant temporary access to specific entities without needing to create a guest account
-  - Add a date range or template to determine if the guest page should be active
-- Lock down the entity list so that the backend can only return the entities that a user has access to, without needing to rely on a frontend filtering script
-- Add a backend option to restrict users from being able to see the current values of entities
-- Add the ability to restrict camera feeds from displaying to users without access
-- Send notifications to users that were blocked from accessing a service
-- Intercept voice commands to return an error message if the user tried to access a blocked service. Right now the returned response always indicates success even if the service call was blocked.
-
-## 🤝 Contributing
-
-Contributions are welcome and much appreciated!
-There are vscode scripts included to easily deploy changes made to the backend or frontend, and auto retart HA when complete.
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Test thoroughly
-5. Submit a pull request
-
-Alternatively, you may submit an issue if you encounter a problem or want to request a new feature.
-
-<p>
-  <a href="https://buymeacoffee.com/samathanas" target="_blank">
-    <img src="https://img.shields.io/badge/Buy%20me%20a%20coffee-☕-yellow.svg" alt="Buy me a coffee" />
-  </a>
-  <br>
-  <small><em>If you like my work, consider supporting me using the buy me a coffee link!</em></small>
-</p>
-
-## 📄 License
-
-This project is licensed under the MIT License.
+通过拦截服务调用，基于纯白名单机制为 Home Assistant 提供精细化的权限管理。
 
 
 
-# Install HACS
+## 🌟 核心理念：V3 的进化
 
-```shell
-# install in docker 
-# proxy config
-export https_proxy=socks5h://192.168.88.107:10809
-export http_proxy=socks5h://192.168.88.107:10809
+在 V3 版本中，我们彻底重构了权限模型，从单一角色（Single-role）转向了**多角色并集（Multi-role Union）**模式：
 
-bash hacs.sh
+- **多角色支持**：一个用户可以同时拥有多个角色，最终权限是所有激活角色权限的并集。
+- **纯白名单模式**：默认“拒绝所有”，只有在角色中明确授权的实体和服务才能被访问。
+- **动态模板评估**：利用 Home Assistant 模板引擎，根据实时状态（如地理位置、时间）动态决定角色是否生效。
+- **管理员豁免**：系统管理员自动绕过所有限制，确保核心配置永远安全可用。
+
+## ✨ 主要功能
+
+- 🛡️ **服务调用拦截**：深度集成底层 Service Registry，自动拦截并校验所有 Home Assistant 服务调用。
+- 👥 **多角色管理**：支持为用户分配多个角色，权限自动合并。
+- 📝 **YAML & GUI 双驱动**：既可以通过现代化的 Web 界面配置，也可以直接编辑 `access_control.yaml`。
+- 🔍 **精细化控制**：支持 Domain（域）、Entity（实体）以及具体 Service（服务）级别的权限管控。
+- 🚀 **前端深度集成**：配合 `rbac.js` 自动隐藏 Quick-bar 中未授权的实体，净化 UI 体验。
+- 🔄 **热重载**：配置修改立即生效，无需重启 Home Assistant。
+- 📊 **拒绝日志**：内置 `deny_log` 接口，实时追踪并记录所有非法访问尝试。
+
+## 📸 界面预览
+
+*(建议在此处更新 V3 版本多角色分配界面的截图)*
+
+- **角色管理**：定义复杂的白名单规则。
+- **用户分配**：为用户勾选多个角色。
+- **动态条件**：配置 `merge_condition` 模板。
+
+## 🚀 快速开始
+
+### HACS 安装 (推荐)
+
+1. 在 HACS 中搜索 `Multi-RBAC` 并安装。
+2. 重启 Home Assistant。
+3. 在集成页面添加 `RBAC`。
+4. 在侧边栏进入配置面板开始设置。
+
+### 手动安装
+
+1. 将 `custom_components/rbac` 拷贝至你的 `custom_components` 目录。
+2. 重启并安装集成。
+
+## 💡 进阶玩法：动态角色控制
+
+利用 V3 的 **Template Conditions**，你可以实现非常智能的场景控制。例如：
+
+**场景：临时访客权限**
+
+> 只有当访客在家时（基于地理位置），其“访客角色”才会生效。如果访客离开，即使账号还在，也无法控制家中设备。
+
+YAML
+
 ```
+# 在角色配置中使用 merge_condition
+merge_condition: "{{ states('person.guest') == 'home' }}"
+```
+
+## 🛠 开发与架构
+
+项目采用了前后端分离的现代化架构：
+
+- **后端**：Python (Home Assistant 集成)，采用 Monkey-patching 技术实现非侵入式中间件。
+- **前端**：Preact + Ant Design + Vite，构建极其轻量且响应迅速的管理后台。
+
+
+
+## 📄 开源协议
+
+本项目基于 MIT 协议开源。欢迎提交 Pull Request 或 Issue！

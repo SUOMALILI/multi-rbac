@@ -49,3 +49,9 @@ coverage.xml
 # Home Assistant configuration
 config/*
 !config/configuration.yaml
+
+
+# frontend build
+custom_components/rbac/www/config.js
+custom_components/rbac/www/src/index.html
+
