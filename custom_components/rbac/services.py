@@ -543,8 +543,12 @@ class RBACConfigView(HomeAssistantView):
                 user_id = data.get("userId")
                 roles = data.get("roles")
 
-                if not user_id or not roles:
-                    return self.json({"error": "Missing userId or roles"}, status_code=400)
+                if not user_id:
+                    return self.json({"error": "Missing userId"}, status_code=400)
+
+                # roles can be empty array (user has no roles)
+                if roles is None:
+                    return self.json({"error": "Missing roles"}, status_code=400)
 
                 if not isinstance(roles, list):
                     return self.json({"error": "roles must be an array"}, status_code=400)

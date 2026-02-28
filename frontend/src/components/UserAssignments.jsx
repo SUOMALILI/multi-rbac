@@ -96,8 +96,8 @@ export function UserAssignments({ data, onSuccess, onError, onDataChange, isDark
 
       const user = data.users.find(u => u.id === userId);
       const userName = user ? user.name : userId;
-      const roleNames = newRoles.join(', ');
-      onSuccess(`Roles "${roleNames}" assigned to ${userName} successfully!`);
+      const roleNames = newRoles.length > 0 ? newRoles.join(', ') : 'No roles';
+      onSuccess(`${newRoles.length > 0 ? `Roles "${roleNames}" assigned to` : 'All roles removed from'} ${userName} successfully!`);
     } catch (error) {
       console.error('Error assigning roles:', error);
       onError(error.message);
