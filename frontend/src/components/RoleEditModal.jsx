@@ -12,6 +12,7 @@ export function RoleEditModal({
   onSave,
   roleName,
   roleConfig,
+  availableRoles = [],
   domains = [],
   entities = [],
   services = {}
@@ -435,9 +436,8 @@ export function RoleEditModal({
                 validator: (_, value) => {
                   if (!value) return Promise.resolve();
                   // 检查角色是否已存在
-                  const availableRoles = props.availableRoles || [];
                   // 如果是编辑现有角色，允许相同名称
-                  const isEditingExisting = props.roleName && props.roleName === value;
+                  const isEditingExisting = roleName && roleName === value;
                   if (!isEditingExisting && availableRoles.includes(value)) {
                     return Promise.reject(new Error(`Role '${value}' already exists`));
                   }
