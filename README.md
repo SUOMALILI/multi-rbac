@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://github.com/SUOMALILI/multi-rbac/raw/main/logo.png" alt="Home Assistant RBAC Logo" width="180" />
+  <img src="https://github.com/SUOMALILI/multi-rbac/raw/main/logo.jpg" alt="Home Assistant RBAC Logo" width="180" />
 </p>
 
 <h1 align="center">🏠 Home Assistant Multi-RBAC Middleware (Dev)</h1>
