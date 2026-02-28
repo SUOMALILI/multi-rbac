@@ -64,6 +64,17 @@ With V3's **Template Conditions**, you can implement highly intelligent scenario
 ```yaml
 # Use merge_condition in role configuration
 merge_condition: "{{ states('person.guest') == 'home' }}"
+```
 
-## 📄 License
-This project is licensed under the MIT License.
+## 🛠 Development & Architecture
+
+The project adopts a modern architecture with separation of frontend and backend:
+Backend: Python (Home Assistant Integration), using Monkey-patching technology to implement non-intrusive middleware.
+Frontend: Preact + Ant Design + Vite, building an extremely lightweight and responsive admin backend.
+
+
+## 📄 Open Source License
+
+This project is open source under the MIT License. Pull Requests and Issues are welcome!
+
+
