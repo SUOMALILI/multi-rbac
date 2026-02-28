@@ -6,77 +6,61 @@
 
 <p align="center">
 
-<strong>更强大、更灵活的多角色访问控制方案。</strong>
+<strong>A more powerful and flexible multi-role access control solution.</strong>
 
-通过拦截服务调用，基于纯白名单机制为 Home Assistant 提供精细化的权限管理。
+Provides granular permission management for Home Assistant by intercepting service calls, based on a pure whitelist mechanism.
 
+</p>
 
+## 🌟 Core Philosophy: Evolution of V3
 
-## 🌟 核心理念：V3 的进化
+In Version V3, we have completely redesigned the permission model, shifting from a **Single-role** approach to a **Multi-role Union** model:
 
-在 V3 版本中，我们彻底重构了权限模型，从单一角色（Single-role）转向了**多角色并集（Multi-role Union）**模式：
+- **Multi-role Support**: A user can have multiple roles at the same time, and the final permissions are the union of the permissions of all activated roles.
+- **Pure Whitelist Mode**: "Deny all" by default; only entities and services explicitly authorized in roles are accessible.
+- **Dynamic Template Evaluation**: Leverage the Home Assistant template engine to dynamically determine whether a role is active based on real-time status (e.g., geographic location, time).
+- **Admin Exemption**: System administrators automatically bypass all restrictions to ensure core configurations remain secure and accessible at all times.
 
-- **多角色支持**：一个用户可以同时拥有多个角色，最终权限是所有激活角色权限的并集。
-- **纯白名单模式**：默认“拒绝所有”，只有在角色中明确授权的实体和服务才能被访问。
-- **动态模板评估**：利用 Home Assistant 模板引擎，根据实时状态（如地理位置、时间）动态决定角色是否生效。
-- **管理员豁免**：系统管理员自动绕过所有限制，确保核心配置永远安全可用。
+## ✨ Key Features
 
-## ✨ 主要功能
+- 🛡️ **Service Call Interception**: Deep integration with the underlying Service Registry to automatically intercept and validate all Home Assistant service calls.
+- 👥 **Multi-role Management**: Support assigning multiple roles to users with automatic permission merging.
+- 📝 **YAML & GUI Dual-Driven**: Configure via a modern web interface or directly edit the `access_control.yaml` file.
+- 🔍 **Granular Control**: Support permission management at the Domain, Entity, and specific Service levels.
+- 🚀 **Deep Frontend Integration**: Works with `rbac.js` to automatically hide unauthorized entities in the Quick-bar for a cleaner UI experience.
+- 🔄 **Hot Reload**: Configuration changes take effect immediately without restarting Home Assistant.
+- 📊 **Deny Logging**: Built-in `deny_log` interface to track and record all unauthorized access attempts in real time.
 
-- 🛡️ **服务调用拦截**：深度集成底层 Service Registry，自动拦截并校验所有 Home Assistant 服务调用。
-- 👥 **多角色管理**：支持为用户分配多个角色，权限自动合并。
-- 📝 **YAML & GUI 双驱动**：既可以通过现代化的 Web 界面配置，也可以直接编辑 `access_control.yaml`。
-- 🔍 **精细化控制**：支持 Domain（域）、Entity（实体）以及具体 Service（服务）级别的权限管控。
-- 🚀 **前端深度集成**：配合 `rbac.js` 自动隐藏 Quick-bar 中未授权的实体，净化 UI 体验。
-- 🔄 **热重载**：配置修改立即生效，无需重启 Home Assistant。
-- 📊 **拒绝日志**：内置 `deny_log` 接口，实时追踪并记录所有非法访问尝试。
+## 📸 UI Preview
 
-## 📸 界面预览
+*(It is recommended to update the screenshot of the V3 multi-role assignment interface here)*
 
-*(建议在此处更新 V3 版本多角色分配界面的截图)*
+- **Role Management**: Define complex whitelist rules.
+- **User Assignment**: Select multiple roles for users.
+- **Dynamic Conditions**: Configure the `merge_condition` template.
 
-- **角色管理**：定义复杂的白名单规则。
-- **用户分配**：为用户勾选多个角色。
-- **动态条件**：配置 `merge_condition` 模板。
+## 🚀 Quick Start
 
-## 🚀 快速开始
+### HACS Installation (Recommended)
 
-### HACS 安装 (推荐)
+1. Search for `Multi-RBAC` in HACS and install it.
+2. Restart Home Assistant.
+3. Add `RBAC` on the Integrations page.
+4. Access the configuration panel from the sidebar to start setup.
 
-1. 在 HACS 中搜索 `Multi-RBAC` 并安装。
-2. 重启 Home Assistant。
-3. 在集成页面添加 `RBAC`。
-4. 在侧边栏进入配置面板开始设置。
+### Manual Installation
 
-### 手动安装
+1. Copy `custom_components/rbac` to your `custom_components` directory.
+2. Restart Home Assistant and install the integration.
 
-1. 将 `custom_components/rbac` 拷贝至你的 `custom_components` 目录。
-2. 重启并安装集成。
+## 💡 Advanced Usage: Dynamic Role Control
 
-## 💡 进阶玩法：动态角色控制
+With V3's **Template Conditions**, you can implement highly intelligent scenario control. For example:
 
-利用 V3 的 **Template Conditions**，你可以实现非常智能的场景控制。例如：
+**Scenario: Temporary Guest Permissions**
 
-**场景：临时访客权限**
+> The "Guest Role" only takes effect when the guest is at home (based on geographic location). If the guest leaves, they cannot control home devices even if their account remains active.
 
-> 只有当访客在家时（基于地理位置），其“访客角色”才会生效。如果访客离开，即使账号还在，也无法控制家中设备。
-
-YAML
-
-```
-# 在角色配置中使用 merge_condition
+```yaml
+# Use merge_condition in role configuration
 merge_condition: "{{ states('person.guest') == 'home' }}"
-```
-
-## 🛠 开发与架构
-
-项目采用了前后端分离的现代化架构：
-
-- **后端**：Python (Home Assistant 集成)，采用 Monkey-patching 技术实现非侵入式中间件。
-- **前端**：Preact + Ant Design + Vite，构建极其轻量且响应迅速的管理后台。
-
-
-
-## 📄 开源协议
-
-本项目基于 MIT 协议开源。欢迎提交 Pull Request 或 Issue！
