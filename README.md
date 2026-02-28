@@ -64,3 +64,6 @@ With V3's **Template Conditions**, you can implement highly intelligent scenario
 ```yaml
 # Use merge_condition in role configuration
 merge_condition: "{{ states('person.guest') == 'home' }}"
+
+## 📄 License
+This project is licensed under the MIT License.
